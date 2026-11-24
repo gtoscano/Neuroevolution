@@ -1,0 +1,112 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "\"\"\"mini-AlexNet\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "AlexNet-style starting point",
+  "ok": true,
+  "val_acc": 0.712,
+  "params": 166442,
+  "seconds": 6.791786432266235
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "\"\"\"Mini-AlexNet with batch normalization after each convolution.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding batch normalization after each convolution will improve validation accuracy over the 0.712 parent by stabilizing feature scales during the two-epoch training run; it adds only 512 trainable parameters.",
+  "ok": true,
+  "val_acc": 0.811,
+  "params": 166954,
+  "seconds": 14.43578839302063
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "\"\"\"Mini-AlexNet with a residual connection in its 64-channel stage.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass ResidualBlock(nn.Module):\n    def __init__(self, channels):\n        super().__init__()\n        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)\n        self.bn1 = nn.BatchNorm2d(channels)\n        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)\n        self.bn2 = nn.BatchNorm2d(channels)\n        self.relu = nn.ReLU()\n\n    def forward(self, x):\n        residual = self.relu(self.bn1(self.conv1(x)))\n        residual = self.bn2(self.conv2(residual))\n        return self.relu(x + residual)\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            ResidualBlock(64),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding an identity residual connection across the two 64-channel convolutions will improve validation accuracy after two epochs by making that stage easier to optimize, while keeping the parameter count below 1,000,000.",
+  "ok": true,
+  "val_acc": 0.7825,
+  "params": 166954,
+  "seconds": 12.329658269882202
+ },
+ {
+  "name": "child_003",
+  "parent": "child_001",
+  "code": "\"\"\"Mini-AlexNet with batch normalization after each convolution.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.25), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.25), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Reducing classifier dropout from 0.5 to 0.25 will improve validation accuracy above 0.811 after two epochs by allowing the classifier to fit the limited training data more quickly.",
+  "ok": true,
+  "val_acc": 0.819,
+  "params": 166954,
+  "seconds": 8.68904733657837
+ },
+ {
+  "name": "child_004",
+  "parent": "child_003",
+  "code": "\"\"\"Mini-AlexNet with batch normalization in the convolutional and dense layers.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.25), nn.Linear(288, 128), nn.BatchNorm1d(128), nn.ReLU(),\n            nn.Dropout(0.25), nn.Linear(128, 128), nn.BatchNorm1d(128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding batch normalization after the two hidden classifier layers will improve validation accuracy over the parent\u2019s 0.819 by stabilizing optimization during the two-epoch training run.",
+  "ok": true,
+  "val_acc": 0.798,
+  "params": 167466,
+  "seconds": 11.905424356460571
+ },
+ {
+  "name": "child_005",
+  "parent": "child_001",
+  "code": "\"\"\"Mini-AlexNet with batch normalization and lighter classifier dropout.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.25), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.25), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Reducing both classifier dropout rates from 0.5 to 0.25 will improve validation accuracy over the parent\u2019s 0.811 by retaining more classifier signal during training, while leaving the parameter count unchanged.",
+  "ok": true,
+  "val_acc": 0.798,
+  "params": 166954,
+  "seconds": 10.461304187774658
+ },
+ {
+  "name": "child_006",
+  "parent": "child_001",
+  "code": "\"\"\"Mini-AlexNet with a pooled, smaller classifier input.\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.pool = nn.AdaptiveAvgPool2d((2, 2))\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        x = self.pool(self.features(x))\n        return self.classifier(x)\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Replacing the final 3\u00d73 feature map with a 2\u00d72 adaptive-average-pooled map before the classifier will reduce classifier parameters by about 20,000 and improve validation accuracy by limiting overfitting on the 6,000-image training set.",
+  "ok": true,
+  "val_acc": 0.7425,
+  "params": 146474,
+  "seconds": 11.95674753189087
+ }
+]

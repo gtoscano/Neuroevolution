@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def lr(step, total):\n    return 1e-3\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.711928606033325
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "import math\n\n# One substantive change vs parent: a OneCycle-style schedule with linear warmup\n# to a higher peak lr, then cosine annealing down to a small final lr.\n# This is a variant of the well-known OneCycle / warmup+cosine schedule.\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"Return learning rate for optimizer step in [0..total-1].\n\n    Schedule parameters chosen for a very short training run (188 steps):\n    - small linear warmup from base_lr to max_lr over pct_start of total steps\n    - cosine anneal from max_lr down to final_lr for the remaining steps\n\n    All returned values are guaranteed in [0.0, 0.05].\n    \"\"\"\n    # Safety for degenerate totals\n    if total <= 0:\n        return 1e-3\n\n    # Hyperparameters (single substantive change from constant lr):\n    base_lr = 1e-4      # start of warmup\n    max_lr = 2.0e-2     # peak lr reached at end of warmup\n    final_lr = 1e-5     # final lr at end of schedule\n    pct_start = 0.30    # fraction of total steps used for linear warmup\n\n    # clamp step\n    s = max(0, min(step, total - 1))\n\n    warmup_steps = max(1, int(total * pct_start))\n\n    if s < warmup_steps:\n        # linear warmup from base_lr -> max_lr (inclusive at end of warmup)\n        t = s / float(warmup_steps)\n        lr_val = base_lr + t * (max_lr - base_lr)\n    else:\n        # cosine anneal from max_lr -> final_lr over remaining steps\n        decay_steps = max(1, total - warmup_steps)\n        t = (s - warmup_steps) / float(decay_steps)\n        # cosine interpolation (t=0 -> cos=1 -> lr=max_lr; t=1 -> cos=0 -> lr=final_lr)\n        cos_term = 0.5 * (1.0 + math.cos(math.pi * t))\n        lr_val = final_lr + (max_lr - final_lr) * cos_term\n\n    # enforce allowed bounds\n    if lr_val < 0.0:\n        lr_val = 0.0\n    if lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Using a OneCycle-like schedule (linear warmup to a higher peak then cosine anneal) will increase mean validation accuracy by at least 0.01, achieving >= 0.735 mean validation accuracy over the 3 seeds.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.6551666666666667,
+  "val_accs": [
+   0.6945,
+   0.6045,
+   0.6665
+  ],
+  "seconds": 5.595304012298584
+ },
+ {
+  "name": "child_002",
+  "parent": "seed",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Learning rate schedule for this search budget.\n# One substantive change vs parent (constant 1e-3):\n# - Linear warmup for the first ~10% of steps to a modestly higher peak LR,\n#   then cosine decay to a small floor LR for stability. A tiny sinusoidal\n#   micro-oscillation (~2%) is layered on top to help exploration.\n# This is a variant of common warmup + cosine decay schedules.\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"\n    Return learning rate for optimizer step in [0, total-1].\n    Must return a float between 0 and 0.05.\n    \"\"\"\n    # Safety and bounds\n    if total <= 0:\n        return 1e-3\n\n    # Hyperparameters (kept modest to be robust on Adam + small data)\n    peak_lr = 3.5e-3    # modestly higher than parent 1e-3\n    min_lr = 5e-6       # small floor for final stability\n    base_lr = 1e-6      # starting lr at step 0\n\n    # Warmup for roughly 10% of training, at least 3 steps\n    warmup_steps = max(3, int(math.ceil(total * 0.10)))\n\n    # Clamp step into [0, total-1]\n    s = max(0, min(step, total - 1))\n\n    if s < warmup_steps and warmup_steps > 0:\n        # Linear warmup from base_lr to peak_lr\n        t = s / float(warmup_steps)\n        lr_val = base_lr + (peak_lr - base_lr) * t\n    else:\n        # Cosine decay from peak_lr down to min_lr over remaining steps\n        remaining = total - warmup_steps\n        if remaining <= 0:\n            lr_val = peak_lr\n        else:\n            t = (s - warmup_steps) / float(remaining)\n            # cosine annealing (t in [0,1])\n            cos_decay = 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, t))))\n            lr_val = min_lr + (peak_lr - min_lr) * cos_decay\n\n    # Small sinusoidal micro-oscillation to help briefly jump out of sharp minima\n    # Frequency chosen so there are several oscillations across training; amplitude small (~2%)\n    osc = 1.0 + 0.02 * math.sin(2.0 * math.pi * (s / 10.0))\n    lr_val *= osc\n\n    # Ensure bounds [0, 0.05]\n    if lr_val < 0.0:\n        lr_val = 0.0\n    elif lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Using a short linear warmup to a slightly higher peak LR followed by cosine decay to a low floor, with a tiny sinusoidal micro-oscillation, will increase mean validation accuracy to at least 0.735 (an improvement >= 0.01 over the parent mean 0.725).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7404999999999999,
+  "val_accs": [
+   0.7425,
+   0.719,
+   0.76
+  ],
+  "seconds": 5.647748708724976
+ },
+ {
+  "name": "child_003",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Learning rate schedule for this search budget.\n# One substantive change vs parent (which used linear warmup + a single cosine decay\n# with a tiny sinusoidal micro-oscillation):\n# - After the warmup, use cosine annealing with a small number of warm restarts\n#   (SGDR-style). Each restart raises the LR back toward the peak for a short\n#   period, then decays again; this periodically injects higher LR to help\n#   escape shallow/early minima in the tiny-budget regime.\n# This is a variant of a known method (cosine annealing with restarts).\n\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"\n    Return learning rate for optimizer step in [0, total-1].\n    Must return a float between 0 and 0.05.\n    \"\"\"\n    # Safety and bounds\n    if total <= 0:\n        return 1e-3\n\n    # Hyperparameters (kept modest to be robust on Adam + small data)\n    peak_lr = 3.5e-3    # same modest peak as parent\n    min_lr = 5e-6       # small floor for final stability\n    base_lr = 1e-6      # starting lr at step 0\n\n    # Warmup for roughly 10% of training, at least 3 steps\n    warmup_steps = max(3, int(math.ceil(total * 0.10)))\n\n    # Clamp step into [0, total-1]\n    s = max(0, min(step, total - 1))\n\n    if s < warmup_steps and warmup_steps > 0:\n        # Linear warmup from base_lr to peak_lr\n        t = s / float(warmup_steps)\n        lr_val = base_lr + (peak_lr - base_lr) * t\n    else:\n        # Cosine annealing with warm restarts across the remaining steps\n        remaining = total - warmup_steps\n        if remaining <= 0:\n            lr_val = peak_lr\n        else:\n            progress = s - warmup_steps  # 0 .. remaining-1\n\n            # Number of restarts (choose a small integer to create several short cycles)\n            cycles = 3\n            # Don't create more cycles than remaining steps\n            cycles = min(cycles, remaining)\n\n            base_len = remaining // cycles\n            extra = remaining % cycles\n\n            # Find which cycle we're in and the local position inside it\n            cum = 0\n            cycle_index = 0\n            cycle_len = 0\n            cycle_start = 0\n            for i in range(cycles):\n                l = base_len + (1 if i < extra else 0)\n                if progress < cum + l:\n                    cycle_index = i\n                    cycle_len = l\n                    cycle_start = cum\n                    break\n                cum += l\n            else:\n                # Fallback to last cycle\n                cycle_index = cycles - 1\n                cycle_len = base_len + (1 if (cycles - 1) < extra else 0)\n                cycle_start = remaining - cycle_len\n\n            # local progress in this cycle [0,1]\n            local_t = (progress - cycle_start) / float(max(1, cycle_len))\n            # cosine anneal within the cycle from peak -> min\n            cos_decay = 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, local_t))))\n\n            # Peak is reset at each restart (no extra decay across restarts here)\n            peak_for_cycle = peak_lr\n            lr_val = min_lr + (peak_for_cycle - min_lr) * cos_decay\n\n    # Keep the parent's small sinusoidal micro-oscillation (~2%) to preserve a\n    # tiny extra per-step jitter that can help brief escapes.\n    osc = 1.0 + 0.02 * math.sin(2.0 * math.pi * (s / 10.0))\n    lr_val *= osc\n\n    # Ensure bounds [0, 0.05]\n    if lr_val < 0.0:\n        lr_val = 0.0\n    elif lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Replacing the single-shot cosine decay with cosine annealing with a few warm restarts (after the same short linear warmup) will improve exploration and raise mean validation accuracy to at least 0.750 (>= +0.01 vs parent mean 0.740). This is falsifiable: measured mean over 3 seeds should be >= 0.750.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7360000000000001,
+  "val_accs": [
+   0.7415,
+   0.703,
+   0.7635
+  ],
+  "seconds": 5.665460824966431
+ },
+ {
+  "name": "child_004",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Learning rate schedule for this search budget.\n# Single substantive change vs parent (which used a small continuous sinusoidal micro-oscillation):\n# - Replace the continuous micro-oscillation with a single, modest Gaussian-shaped \"re-warm\" bump\n#   centered near 80% of training (amplitude ~+20%, narrow width). The main warmup + cosine\n#   decay structure is unchanged. This is a small variant of warm-restart/re-warm ideas.\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"\n    Return learning rate for optimizer step in [0, total-1].\n    Must return a float between 0 and 0.05.\n    \"\"\"\n    # Safety and bounds\n    if total <= 0:\n        return 1e-3\n\n    # Hyperparameters (kept modest to be robust on Adam + small data)\n    peak_lr = 3.5e-3    # modestly higher than textbook 1e-3\n    min_lr = 5e-6       # small floor for final stability\n    base_lr = 1e-6      # starting lr at step 0\n\n    # Warmup for roughly 10% of training, at least 3 steps\n    warmup_steps = max(3, int(math.ceil(total * 0.10)))\n\n    # Clamp step into [0, total-1]\n    s = max(0, min(step, total - 1))\n\n    if s < warmup_steps and warmup_steps > 0:\n        # Linear warmup from base_lr to peak_lr\n        t = s / float(warmup_steps)\n        lr_val = base_lr + (peak_lr - base_lr) * t\n    else:\n        # Cosine decay from peak_lr down to min_lr over remaining steps\n        remaining = total - warmup_steps\n        if remaining <= 0:\n            lr_val = peak_lr\n        else:\n            t = (s - warmup_steps) / float(remaining)\n            # cosine annealing (t in [0,1])\n            cos_decay = 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, t))))\n            lr_val = min_lr + (peak_lr - min_lr) * cos_decay\n\n    # ONE substantive change vs parent:\n    # Replace ongoing micro-oscillation with a single late-stage Gaussian \"re-warm\" bump\n    # centered at frac_center of the schedule, amplitude ~+20%, and moderate width.\n    # This is intended to give a short boost late in training to help escape shallow minima.\n    frac_center = 0.80\n    amp = 0.20  # 20% multiplicative increase at the center\n    # Width: a few percent of total steps; ensure at least 1 step of width\n    sigma_steps = max(1.0, total * 0.06)\n    center_step = frac_center * float(max(0, total - 1))\n\n    # Gaussian bump multiplier\n    rel = (s - center_step) / float(sigma_steps)\n    bump = 1.0 + amp * math.exp(-0.5 * (rel * rel))\n\n    lr_val *= bump\n\n    # Ensure bounds [0, 0.05]\n    if lr_val < 0.0:\n        lr_val = 0.0\n    elif lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Replacing the continuous small sinusoidal micro-oscillation with a single late-stage rewarm (a Gaussian-shaped LR bump centered at 80% of training, ~+20% amplitude) will help the optimizer escape late, shallow minima and improve generalization. I hypothesize mean validation accuracy >= 0.750 (an increase of at least 0.01 over the parent mean 0.740).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7331666666666666,
+  "val_accs": [
+   0.7395,
+   0.704,
+   0.756
+  ],
+  "seconds": 5.790722370147705
+ },
+ {
+  "name": "child_005",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Learning rate schedule for this search budget.\n# One substantive change vs parent:\n# - A single, short mid-training rewarm: a triangular bump that raises the LR\n#   (up to 1.5x peak) for a narrow window centered around ~60% of training.\n# This is a variant of warm-restart / rewarm techniques, applied as one short\n# transient boost rather than multiple restarts.\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"\n    Return learning rate for optimizer step in [0, total-1].\n    Must return a float between 0 and 0.05.\n\n    Schedule summary:\n    - Small linear warmup (\u22488% of total) from base_lr to peak_lr\n    - Cosine decay from peak_lr down to min_lr over the rest of training\n    - Single triangular rewarm bump centered at ~60% of (post-warmup) progress\n      that raises LR up to rewarm_peak_factor * peak_lr for a brief window.\n    \"\"\"\n    # Safety and bounds\n    if total <= 0:\n        return 1e-3\n\n    # Hyperparameters (conservative for Adam + small dataset)\n    base_lr = 1e-6       # lr at step 0\n    peak_lr = 4.0e-3     # modestly higher than parent\n    min_lr = 5e-6        # final floor for stability\n\n    # Warmup: ~8% of training, at least 3 steps\n    warmup_steps = max(3, int(math.ceil(total * 0.08)))\n\n    # Rewarm (single transient bump) settings:\n    # center is offset from warmup by a fraction of the remaining steps\n    rewarm_center_frac = 0.60   # center at 60% of the post-warmup span\n    rewarm_width_frac = 0.12    # width ~12% of post-warmup span\n    rewarm_peak_factor = 1.5    # bump raises LR up to 1.5 * peak_lr at center\n\n    # Clamp step into [0, total-1]\n    s = max(0, min(int(step), max(0, total - 1)))\n\n    # Warmup phase\n    if s < warmup_steps and warmup_steps > 0:\n        t = s / float(warmup_steps)\n        lr_val = base_lr + (peak_lr - base_lr) * t\n    else:\n        # Cosine decay from peak_lr down to min_lr over remaining steps\n        remaining = total - warmup_steps\n        if remaining <= 0:\n            lr_val = peak_lr\n        else:\n            t = (s - warmup_steps) / float(max(1, remaining))\n            # cosine annealing (t in [0,1])\n            cos_decay = 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, t))))\n            lr_val = min_lr + (peak_lr - min_lr) * cos_decay\n\n        # Apply one short triangular rewarm bump\n        # Compute center and width (in absolute steps)\n        center = warmup_steps + int(round(remaining * rewarm_center_frac))\n        width = max(3, int(round(remaining * rewarm_width_frac)))\n        half = width / 2.0\n        dist = abs(s - center)\n        if dist <= half:\n            # triangular shape in [0,1], 1 at center, 0 at edges\n            tri = 1.0 - (dist / half) if half > 0 else 1.0\n            bump_factor = 1.0 + (rewarm_peak_factor - 1.0) * tri\n            lr_val = lr_val * bump_factor\n\n    # Ensure bounds [0, 0.05]\n    if lr_val < 0.0:\n        lr_val = 0.0\n    elif lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Adding a single, short mid-training rewarm (a triangular LR bump to 1.5x the peak LR centered at ~60% of training) will improve exploration and escape shallow minima, increasing mean validation accuracy by >= 0.01 (i.e. mean >= 0.750) compared to the parent (0.740).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7383333333333333,
+  "val_accs": [
+   0.747,
+   0.716,
+   0.752
+  ],
+  "seconds": 5.8878333568573
+ },
+ {
+  "name": "child_006",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Learning rate schedule variant: warmup -> hold (flat top) -> cosine decay\n# One substantive change vs parent (which does warmup then immediate cosine decay):\n# - After the linear warmup, hold the LR at the peak for a short plateau (~30% of total steps)\n#   before applying cosine decay to the final floor LR. The small sinusoidal micro-oscillation\n#   from the parent is retained (minor) so the only substantive change is the insertion of\n#   the flat hold period. This is a variant of common warmup+cosine schedules (warmup+hold+decay).\n\ndef lr(step: int, total: int) -> float:\n    \"\"\"\n    Return learning rate for optimizer step in [0, total-1].\n    Must return a float between 0 and 0.05.\n    \"\"\"\n    if total <= 0:\n        return 1e-3\n\n    # Base hyperparameters (conservative for Adam + small dataset)\n    peak_lr = 3.5e-3    # modestly higher than the textbook default\n    min_lr = 5e-6       # final floor for stability\n    base_lr = 1e-6      # starting lr at step 0\n\n    # Keep parent's warmup fraction (roughly 10% of training)\n    warmup_steps = max(3, int(math.ceil(total * 0.10)))\n\n    # NEW (substantive): hold the peak LR for a fraction of training after warmup\n    # Use a flat-top for about 30% of the total steps (can be zero if tiny total)\n    hold_steps = int(math.floor(total * 0.30))\n\n    # Clamp step into [0, total-1]\n    s = max(0, min(step, total - 1))\n\n    if s < warmup_steps and warmup_steps > 0:\n        # Linear warmup from base_lr to peak_lr\n        t = s / float(warmup_steps)\n        lr_val = base_lr + (peak_lr - base_lr) * t\n    elif s < warmup_steps + hold_steps:\n        # HOLD: keep LR at the peak for a short plateau\n        lr_val = peak_lr\n    else:\n        # Cosine decay from peak_lr down to min_lr over remaining steps\n        remaining = total - (warmup_steps + hold_steps)\n        if remaining <= 0:\n            # If no remaining steps, keep peak (edge case when total is small)\n            lr_val = peak_lr\n        else:\n            t = (s - (warmup_steps + hold_steps)) / float(remaining)\n            # cosine annealing (t in [0,1])\n            cos_decay = 0.5 * (1.0 + math.cos(math.pi * min(1.0, max(0.0, t))))\n            lr_val = min_lr + (peak_lr - min_lr) * cos_decay\n\n    # Keep the parent's small sinusoidal micro-oscillation (~2%) to help exploration\n    osc = 1.0 + 0.02 * math.sin(2.0 * math.pi * (s / 10.0))\n    lr_val *= osc\n\n    # Ensure bounds [0, 0.05]\n    if lr_val < 0.0:\n        lr_val = 0.0\n    elif lr_val > 0.05:\n        lr_val = 0.05\n\n    return float(lr_val)\n",
+  "hypothesis": "Keeping the LR at its peak for a short 'flat' plateau after warmup (warmup -> hold -> cosine decay) will give the network more stable, effective early updates on this very short training budget and improve generalization. I hypothesize mean validation accuracy will increase above 0.750 (i.e., mean > 0.750).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7491666666666666,
+  "val_accs": [
+   0.752,
+   0.728,
+   0.7675
+  ],
+  "seconds": 5.616953134536743
+ }
+]

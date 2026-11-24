@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def augment(x):\n    return x\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.7369704246521
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "def augment(x):\n    return x + 0.32 * torch.randn_like(x)\n",
+  "hypothesis": "known design: Gaussian noise, sigma 0.32",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6851666666666666,
+  "val_accs": [
+   0.6785,
+   0.6745,
+   0.7025
+  ],
+  "seconds": 5.928815603256226
+ },
+ {
+  "name": "child_002",
+  "parent": "seed",
+  "code": "def augment(x):\n    return x + 0.37 * torch.randn_like(x)\n",
+  "hypothesis": "known design: Gaussian noise, sigma 0.37",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7003333333333334,
+  "val_accs": [
+   0.6845,
+   0.7115,
+   0.705
+  ],
+  "seconds": 6.149879455566406
+ },
+ {
+  "name": "child_003",
+  "parent": "seed",
+  "code": "def augment(x):\n    flip = torch.rand(x.shape[0], 1, 1, 1) < 0.5\n    return torch.where(flip, x.flip(3), x)\n",
+  "hypothesis": "known design: horizontal flip, p 0.5",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7005,
+  "val_accs": [
+   0.716,
+   0.683,
+   0.7025
+  ],
+  "seconds": 5.918864965438843
+ },
+ {
+  "name": "child_004",
+  "parent": "seed",
+  "code": "def augment(x):\n    i, j = torch.randint(0, 19, (2,)).tolist()\n    x = x.clone()\n    x[:, :, i:i + 9, j:j + 9] = 0\n    return x\n",
+  "hypothesis": "known design: erase a 9x9 patch",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6991666666666667,
+  "val_accs": [
+   0.7005,
+   0.678,
+   0.719
+  ],
+  "seconds": 5.580880641937256
+ },
+ {
+  "name": "child_005",
+  "parent": "seed",
+  "code": "def augment(x):\n    i, j = torch.randint(0, 21, (2,)).tolist()\n    x = x.clone()\n    x[:, :, i:i + 7, j:j + 7] = 0\n    return x\n",
+  "hypothesis": "known design: erase a 7x7 patch",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6986666666666667,
+  "val_accs": [
+   0.7145,
+   0.6515,
+   0.73
+  ],
+  "seconds": 6.060884714126587
+ },
+ {
+  "name": "child_006",
+  "parent": "child_003",
+  "code": "def augment(x):\n    dx, dy = torch.randint(-3, 4, (2,)).tolist()\n    return torch.roll(x, shifts=(dy, dx), dims=(2, 3))\n",
+  "hypothesis": "known design: random shift up to 3 px",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6168333333333332,
+  "val_accs": [
+   0.6535,
+   0.5555,
+   0.6415
+  ],
+  "seconds": 5.61128830909729
+ }
+]

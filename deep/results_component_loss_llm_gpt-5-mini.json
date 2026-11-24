@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def loss(logits, y):\n    return torch.nn.functional.cross_entropy(logits, y)\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.742611646652222
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Cross-entropy with a small confidence penalty (aka entropy regularization).\n# Known method: add lambda * sum p * log p to penalize overconfident predictions.\n# This implementation is cheap (one softmax/log-softmax) and returns a scalar.\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Compute cross-entropy plus a confidence penalty (negative entropy term).\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar loss.\n    \"\"\"\n    # strength of the confidence penalty; small value to avoid overpowering CE\n    beta = 0.1\n\n    # compute log-probabilities once for numerical stability\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)\n\n    # standard cross-entropy (mean over batch)\n    ce = torch.nn.functional.nll_loss(log_probs, y, reduction='mean')\n\n    # predictive distribution\n    probs = torch.exp(log_probs)\n\n    # sum p * log p per example (this is the negative entropy); mean over batch\n    neg_entropy = (probs * log_probs).sum(dim=1).mean()\n\n    # final loss: CE + beta * (sum p log p)\n    return ce + beta * neg_entropy\n",
+  "hypothesis": "Adding a small confidence-penalty (entropy regularization) term to cross-entropy will reduce overconfidence and improve generalization on this small-budget setting. I hypothesize mean validation accuracy will increase from 0.725 to at least 0.735 (mean over three seeds >= 0.735).",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7278333333333333,
+  "val_accs": [
+   0.73,
+   0.6965,
+   0.757
+  ],
+  "seconds": 5.584980726242065
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Label-smoothed cross-entropy loss.\n# Known method: replace hard one-hot targets with a smoothed distribution and compute\n# the cross-entropy against the model log-probabilities. Cheap (one log_softmax)\n# and differentiable.\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Compute label-smoothed cross-entropy.\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar loss (mean over the batch).\n    \"\"\"\n    # smoothing strength: fraction of probability mass moved off the true label\n    smoothing = 0.1\n\n    # compute log-probabilities once for numerical stability\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)\n\n    # number of classes\n    C = logits.size(1)\n\n    # create the smoothed target distribution in a numerically-safe way\n    with torch.no_grad():\n        # fill with smoothing mass distributed uniformly to non-target classes\n        smoothed = torch.full_like(log_probs, smoothing / (C - 1))\n        smoothed.scatter_(1, y.unsqueeze(1), 1.0 - smoothing)\n\n    # negative log-likelihood of smoothed targets\n    loss_per_example = -(smoothed * log_probs).sum(dim=1)\n    return loss_per_example.mean()\n",
+  "hypothesis": "Applying label smoothing (smoothing=0.1) to replace the hard one-hot targets will improve generalization. I hypothesize mean validation accuracy will increase from 0.728 to at least 0.740 (i.e., a >=0.012 absolute improvement).",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7363333333333334,
+  "val_accs": [
+   0.733,
+   0.733,
+   0.743
+  ],
+  "seconds": 5.5489661693573
+ },
+ {
+  "name": "child_003",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Focal loss for multi-class classification (known method).\n# Focal loss down-weights well-classified examples by (1 - p_t)^gamma, where p_t\n# is the model probability for the true class. This encourages the optimizer to\n# focus on harder examples and can improve generalization in limited-data regimes.\n# Implemented in a numerically-stable way using log_softmax.\n\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Compute multi-class focal loss.\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar (mean over the batch).\n    \"\"\"\n    # focal loss hyperparameters\n    gamma = 2.0   # focusing parameter; gamma=0 recovers standard CE\n    alpha = 1.0   # optional scalar class weight (set to 1.0 means no class reweighting)\n\n    # compute log-probabilities once for numerical stability\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)  # (N, C)\n    probs = log_probs.exp()  # (N, C)\n\n    # gather probabilities/log-probs of the true class\n    idx = y.view(-1, 1)\n    p_t = probs.gather(1, idx).squeeze(1).clamp(min=1e-12)        # (N,)\n    log_p_t = log_probs.gather(1, idx).squeeze(1)                 # (N,)\n\n    # focal loss per example: -(1 - p_t)^gamma * log(p_t)\n    modulating = (1.0 - p_t) ** gamma\n    loss_per_example = -alpha * modulating * log_p_t\n\n    return loss_per_example.mean()\n",
+  "hypothesis": "Replacing label-smoothed cross-entropy with a focal loss (gamma=2.0) will focus training on harder examples and improve generalization; I hypothesize mean validation accuracy will increase by at least 0.01 (from 0.736 to >= 0.746).",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7051666666666666,
+  "val_accs": [
+   0.7155,
+   0.673,
+   0.727
+  ],
+  "seconds": 5.741923093795776
+ },
+ {
+  "name": "child_004",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Adaptive label smoothing loss.\n# Variant of known method: label smoothing whose strength is adjusted per-example\n# according to the model's current confidence (max predicted probability).\n# More confident predictions receive stronger smoothing to discourage overconfidence.\n# Cheap: one log_softmax per batch and a small amount of elementwise tensor work.\n\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Adaptive label-smoothed cross-entropy.\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar loss (mean over the batch).\n    \"\"\"\n    # compute log-probabilities once for numerical stability\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)\n\n    N, C = logits.shape\n\n    # Compute per-example confidence (max predicted probability) without creating\n    # a gradient path through the target distribution.\n    with torch.no_grad():\n        probs = torch.exp(log_probs)  # numerically stable softmax\n        p_max = probs.max(dim=1).values  # shape (N,)\n\n        # Adaptive smoothing parameters (tunable). We map p_max in [1/C, 1]\n        # to smoothing in [min_s, max_s]. When the model is near-uniform (p_max~=1/C)\n        # use minimal smoothing; when it's confident (p_max->1) use maximal smoothing.\n        min_s = 0.05\n        max_s = 0.20\n\n        # avoid division by zero for degenerate C\n        if C <= 1:\n            smoothing = torch.full((N,), min_s, device=logits.device, dtype=logits.dtype)\n        else:\n            base = 1.0 / float(C)\n            denom = 1.0 - base\n            # scale factor in [0,1]\n            factor = (p_max - base) / denom\n            factor = factor.clamp(0.0, 1.0)\n            smoothing = (min_s + (max_s - min_s) * factor).clamp(min_s, max_s)\n\n        # build smoothed target distributions per example\n        # each non-target entry gets smoothing/(C-1), target gets 1 - smoothing\n        off_val = (smoothing / float(C - 1)).unsqueeze(1)  # (N,1)\n        on_val = (1.0 - smoothing).unsqueeze(1)  # (N,1)\n\n        # create smoothed target matrix\n        smoothed = off_val.expand(-1, C).clone()\n        smoothed.scatter_(1, y.unsqueeze(1), on_val)\n\n    # negative log-likelihood of smoothed targets\n    loss_per_example = -(smoothed * log_probs).sum(dim=1)\n    return loss_per_example.mean()\n",
+  "hypothesis": "Applying adaptive label smoothing that increases smoothing for more confident (high p_max) predictions will improve regularization in this low-data regime and increase mean validation accuracy by at least 0.01 over the parent (i.e., mean >= 0.746).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7338333333333332,
+  "val_accs": [
+   0.733,
+   0.716,
+   0.7525
+  ],
+  "seconds": 5.704772710800171
+ },
+ {
+  "name": "child_005",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Self-distillation style label smoothing (variant of label smoothing / knowledge distillation).\n# For each example we form a soft target that is a convex combination of the hard one-hot\n# label and the model's own softened prediction (teacher) computed at a temperature T.\n# The teacher probabilities are detached so gradients flow only through the usual model\n# log-probabilities. This can be seen as adaptive smoothing: when the model is uncertain\n# its softened teacher is diffuse and the target is closer to one-hot; when confident the\n# teacher provides informative soft mass across classes.\n#\n# Rationale for this budget: with only 2 epochs and small data, using the model's own\n# soft predictions as the smoothing prior gives more informative regularization than\n# uniform smoothing while remaining cheap (one softmax and one log_softmax per batch).\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Compute self-distillation label-smoothed cross-entropy.\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar loss (mean over the batch).\n    \"\"\"\n    # mixing coefficient: fraction of target mass coming from the softened model predictions\n    smoothing = 0.10  # like conventional label smoothing strength\n    # temperature to soften the model's own predictions (teacher); >1 -> softer\n    temperature = 2.0\n\n    # log-probabilities for the student (used by loss) - stable single op\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)\n\n    # build hard one-hot targets\n    with torch.no_grad():\n        C = logits.size(1)\n        # one-hot target\n        one_hot = torch.zeros_like(logits).scatter_(1, y.unsqueeze(1), 1.0)\n\n        # teacher probabilities: softened model predictions; detach to avoid gradients through targets\n        teacher_probs = torch.nn.functional.softmax(logits / float(temperature), dim=1)\n        teacher_probs = teacher_probs.detach()\n\n        # convex combination: (1 - smoothing) * one_hot + smoothing * teacher_probs\n        # This preserves a valid probability distribution per-example.\n        target = (1.0 - smoothing) * one_hot + smoothing * teacher_probs\n\n    # cross-entropy against the mixed (soft) target\n    loss_per_example = -(target * log_probs).sum(dim=1)\n    return loss_per_example.mean()\n",
+  "hypothesis": "Mixing the hard one-hot targets with the model's own softened predictions (self-distillation-style label smoothing) will improve generalization under this low-data, short-training budget. I hypothesize mean validation accuracy >= 0.747 (an improvement of >= 0.011 over the parent mean 0.736).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7251666666666666,
+  "val_accs": [
+   0.7265,
+   0.7095,
+   0.7395
+  ],
+  "seconds": 5.7618489265441895
+ },
+ {
+  "name": "child_006",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Top-k label smoothing.\n# Variant: instead of distributing the smoothing mass uniformly across all non-target classes,\n# distribute it uniformly among the model's top-k predicted non-target classes for each example.\n# Rationale: the smoothed mass is concentrated on the most-plausible confusions, providing\n# a more informative soft target while still regularizing overconfidence.\n\n\ndef loss(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:\n    \"\"\"Compute top-k label-smoothed cross-entropy.\n\n    logits: (N, C)\n    y: (N,) integer class labels\n\n    Returns a differentiable scalar loss (mean over the batch).\n    \"\"\"\n    # base smoothing strength\n    smoothing = 0.10\n    # how many non-target classes receive the smoothing mass per example\n    top_k = 3\n\n    # compute log-probabilities once for numerical stability\n    log_probs = torch.nn.functional.log_softmax(logits, dim=1)\n    C = logits.size(1)\n    N = logits.size(0)\n\n    # prepare smoothed target distributions (constructed without gradient)\n    with torch.no_grad():\n        # initialize all zeros (we'll set mass only on true label and on selected non-targets)\n        smoothed = torch.zeros_like(log_probs)\n\n        # ensure k is not larger than available non-target classes\n        k = min(top_k, max(1, C - 1))\n\n        # find top-(k+1) indices by logit value so we can skip the true label if present\n        # (k+1 to allow for the case where the true label is among top-k predictions)\n        Kplus = min(C, k + 1)\n        top_indices = torch.topk(logits, k=Kplus, dim=1).indices  # (N, Kplus)\n\n        # For each example, choose up to k non-target top indices. If there are fewer than k\n        # candidates in the top-Kplus (rare when C is small), fall back to distributing the\n        # smoothing uniformly across all non-target classes.\n        y_unsq = y.unsqueeze(1)\n\n        for i in range(N):\n            yi = int(y[i].item())\n            # set mass on the true label\n            smoothed[i, yi] = 1.0 - smoothing\n\n            # collect up to k non-target indices from the top candidates\n            chosen = []\n            for idx in top_indices[i].tolist():\n                if idx != yi:\n                    chosen.append(idx)\n                    if len(chosen) >= k:\n                        break\n\n            if len(chosen) > 0:\n                per = smoothing / float(len(chosen))\n                smoothed[i, chosen] = per\n            else:\n                # fallback: distribute smoothing uniformly to all non-target classes\n                if C - 1 > 0:\n                    per = smoothing / float(C - 1)\n                    # create a mask of non-target indices\n                    mask = torch.ones(C, device=logits.device, dtype=logits.dtype)\n                    mask[yi] = 0.0\n                    smoothed[i] = smoothed[i] + mask * per\n\n    # negative log-likelihood of smoothed targets\n    loss_per_example = -(smoothed * log_probs).sum(dim=1)\n    return loss_per_example.mean()\n",
+  "hypothesis": "Variant of label smoothing that redistributes the smoothing mass to the model's top-k predicted non-target classes (rather than uniformly to all non-targets) will produce better, more informative targets and improve generalization on this small-budget regime. I hypothesize the mean validation accuracy (3-seed average) will increase by at least 0.01 vs the parent, reaching >= 0.746.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7188333333333333,
+  "val_accs": [
+   0.724,
+   0.6925,
+   0.74
+  ],
+  "seconds": 5.845670223236084
+ }
+]

@@ -1,0 +1,294 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "\"\"\"mini-AlexNet\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "AlexNet-style starting point",
+  "ok": true,
+  "val_acc": 0.731,
+  "params": 166442,
+  "seconds": 5.209875822067261
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "\"\"\"offline mutation: width\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 64), nn.ReLU(),\n            nn.Linear(64, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    64
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "random mutation 'width'",
+  "ok": true,
+  "val_acc": 0.715,
+  "params": 157546,
+  "seconds": 6.656881332397461
+ },
+ {
+  "name": "child_002",
+  "parent": "seed",
+  "code": "\"\"\"offline mutation: remove_conv\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(1568, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "random mutation 'remove_conv'",
+  "ok": true,
+  "val_acc": 0.7675,
+  "params": 293354,
+  "seconds": 10.275032758712769
+ },
+ {
+  "name": "child_003",
+  "parent": "child_002",
+  "code": "\"\"\"offline mutation: pool\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(6272, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "random mutation 'pool'",
+  "ok": true,
+  "val_acc": 0.7865,
+  "params": 895466,
+  "seconds": 55.962499380111694
+ },
+ {
+  "name": "child_004",
+  "parent": "child_003",
+  "code": "\"\"\"offline mutation: add_conv\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(32, 8, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(8, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(6272, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 8,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "random mutation 'add_conv'",
+  "ok": true,
+  "val_acc": 0.792,
+  "params": 888050,
+  "seconds": 50.27456045150757
+ },
+ {
+  "name": "child_005",
+  "parent": "child_003",
+  "code": "\"\"\"offline mutation: remove_fc\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(6272, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "random mutation 'remove_fc'",
+  "ok": true,
+  "val_acc": 0.8205,
+  "params": 878954,
+  "seconds": 65.9456844329834
+ },
+ {
+  "name": "child_006",
+  "parent": "child_004",
+  "code": "\"\"\"offline mutation: dropout\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(32, 8, kernel_size=5, padding=2), nn.ReLU(),\n            nn.Conv2d(8, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.25), nn.Linear(6272, 128), nn.ReLU(),\n            nn.Dropout(0.25), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 8,
+     "k": 5,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.25
+  },
+  "hypothesis": "random mutation 'dropout'",
+  "ok": true,
+  "val_acc": 0.802,
+  "params": 888050,
+  "seconds": 53.04682970046997
+ }
+]

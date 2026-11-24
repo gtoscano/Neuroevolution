@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def act(x):\n    return torch.relu(x)\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.907098770141602
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# A lightweight, slightly scaled Swish (SiLU) variant:\n# act(x) = scale * x * sigmoid(beta * x)\n# - Swish/SiLU is a smooth, non-monotonic activation that often trains faster than ReLU.\n# - We use a mild scaling and beta<1 to make gradients well-conditioned for this small network\n#   and the short (2-epoch) training budget.\n# This function is stateless and fast (only a sigmoid and elementwise ops).\n\n_SCALE = 1.15\n_BETA = 0.9\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"Activation applied after every conv and hidden linear layer.\n\n    Returns tensor of the same shape as input.\n\n    Implementation: scaled Swish (x * sigmoid(beta * x)) to give a smooth, nonzero-centered\n    activation with gentle gradient flow for negative inputs.\n    \"\"\"\n    # Use torch.sigmoid which is implemented efficiently; keep operations vectorized.\n    return _SCALE * x * torch.sigmoid(_BETA * x)\n",
+  "hypothesis": "Replacing ReLU with a mildly scaled Swish (SiLU) variant will improve optimization in this small AlexNet-style network under the tight training budget. I hypothesize the mean validation accuracy (averaged over 3 seeds) will increase to at least 0.736 (an improvement >0.01 over the parent 0.725). This is falsifiable by running the 3-seed evaluation.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7488333333333334,
+  "val_accs": [
+   0.745,
+   0.7315,
+   0.77
+  ],
+  "seconds": 11.364874839782715
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# SmallMish: a lightweight, tempered variant of Mish\n# act(x) = scale * x * tanh( softplus(beta * x) )\n# - Mish = x * tanh(softplus(x)) is a smooth, non-monotonic activation that often\n#   improves optimization vs. ReLU/SiLU. Here we mildly temper the input to softplus\n#   (beta < 1) and apply a modest scale to keep activation magnitudes well-conditioned\n#   for this small network and its short, CPU-bound training budget.\n# - Stateless, fully elementwise, uses torch.nn.functional.softplus and torch.tanh.\n\n_SCALE = 0.95\n_BETA = 0.8\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"Activation applied after every conv and hidden linear layer.\n\n    Returns a tensor with the same shape as the input.\n\n    Implementation: tempered+scaled Mish: scale * x * tanh( softplus(beta * x) ).\n    \"\"\"\n    # Use the efficient softplus from torch.nn.functional and vectorized ops.\n    return _SCALE * x * torch.tanh(torch.nn.functional.softplus(_BETA * x))\n",
+  "hypothesis": "Replacing the scaled-Swish with a lightly-scaled, tempered Mish (act(x) = scale * x * tanh(softplus(beta * x))) will increase mean validation accuracy to at least 0.76 (i.e., a >0.01 improvement over the parent mean 0.749). This is falsifiable by running the 3-seed evaluation and checking the mean.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7518333333333334,
+  "val_accs": [
+   0.755,
+   0.74,
+   0.7605
+  ],
+  "seconds": 10.570380926132202
+ },
+ {
+  "name": "child_003",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# LeakySmallMish: tempered Mish with a small linear negative tail\n# act(x) = scale * ( x * tanh( softplus(beta * x) ) + leak * clamp(x, max=0) )\n# - Keeps the smooth, non-monotonic behaviour of Mish for most inputs but adds a\n#   small negative-side linear slope (leak) to improve gradient flow for negative\n#   activations (similar in spirit to LeakyReLU) without making the function\n#   piecewise-discontinuous.\n# - Stateless, fully elementwise, uses torch.nn.functional.softplus and torch.tanh.\n\n_SCALE = 0.96   # modest overall scale to keep magnitudes conditioned for this small net\n_BETA = 0.85    # temper softplus input slightly (like SmallMish)\n_LEAK = 0.03    # small negative-side linear tail (only affects x < 0)\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"Activation applied after every conv and hidden linear layer.\n\n    Returns a tensor with the same shape as the input.\n\n    Implementation: tempered Mish with a small negative linear tail\n    (LeakySmallMish):\n        out = scale * ( x * tanh( softplus(beta * x) ) + leak * clamp(x, max=0) )\n\n    The extra clamp term is cheap, elementwise, and preserves shape and dtype.\n    \"\"\"\n    sp = torch.nn.functional.softplus(_BETA * x)\n    mish_core = x * torch.tanh(sp)\n    negative_tail = torch.clamp(x, max=0.0) * _LEAK\n    return _SCALE * (mish_core + negative_tail)\n",
+  "hypothesis": "Replacing the tempered Mish with a lightly 'leaky' tempered Mish (adds a small linear negative tail) will improve optimization/stability on this small, short-budget training run; I hypothesize mean validation accuracy >= 0.763 over 3 seeds.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7535,
+  "val_accs": [
+   0.754,
+   0.742,
+   0.7645
+  ],
+  "seconds": 14.761335611343384
+ },
+ {
+  "name": "child_004",
+  "parent": "child_003",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# SmoothCompressedHardSwish: a variant of Hard-Swish with mild positive compression\n# and a small negative linear tail.\n# - Core: hardswish(x) = x * clamp((x + 3) / 6, 0, 1) (cheap, piecewise linear)\n# - Mild positive compression: multiply core by (1 - c * sigmoid(k*x)) to slightly\n#   reduce very large positive activations (stabilizes magnitudes in small nets).\n# - Small negative linear tail (leak) for x < 0 to improve gradient flow on negative side.\n# - A modest overall scale keeps magnitudes conditioned for this model size.\n\n_SCALE = 0.98   # slight overall scaling\n_LEAK = 0.05    # small negative slope for x < 0\n_COMP_C = 0.09  # compression strength for large positives\n_COMP_K = 0.6   # compression sharpness\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"Activation applied after every conv and hidden linear layer.\n\n    Returns a tensor with the same shape and dtype as the input.\n\n    Implementation details (SmoothCompressedHardSwish):\n      t = clamp((x + 3) / 6, 0, 1)\n      hswish = x * t\n      comp = 1 - COMP_C * sigmoid(COMP_K * x)\n      out_core = hswish * comp\n      negative_tail = LEAK * clamp(x, max=0)\n      out = SCALE * (out_core + negative_tail)\n\n    This is a stateless, elementwise function that is cheap to compute on CPU.\n    \"\"\"\n    # Hard-swish core (cheap piecewise linear gating)\n    t = torch.clamp((x + 3.0) / 6.0, min=0.0, max=1.0)\n    hswish = x * t\n\n    # Mild smooth compression on the positive side to limit extreme positive magnitudes\n    comp = 1.0 - _COMP_C * torch.sigmoid(_COMP_K * x)\n    out_core = hswish * comp\n\n    # Small negative linear tail for x < 0\n    negative_tail = torch.clamp(x, max=0.0) * _LEAK\n\n    return _SCALE * (out_core + negative_tail)",
+  "hypothesis": "Using a smoothly-compressed Hard-Swish backbone with a small negative linear tail (a variant of Hard-Swish) will improve optimization/stability on this small AlexNet budget; I hypothesize the mean validation accuracy (over the 3 seeds) will reach at least 0.763 (i.e. >= 0.01 improvement over the parent mean 0.753).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7283333333333334,
+  "val_accs": [
+   0.734,
+   0.714,
+   0.737
+  ],
+  "seconds": 15.707330703735352
+ },
+ {
+  "name": "child_005",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# Leaky-GELU (lightweight variant):\n# act(x) = scale * (GELU(x) + leak * x * I[x < 0])\n# - GELU (approximate tanh form) gives smooth, non-monotonic responses that often\n#   help optimization vs. ReLU/SiLU in small networks.\n# - We add a small linear negative tail (leak) to ensure steady gradient flow for\n#   strongly negative pre-activations (cheap, elementwise) and apply a mild scale\n#   to keep activation magnitudes well-conditioned for this small CPU-bound run.\n# - Stateless, fully elementwise, uses only torch.ops and math, so it's fast per-batch.\n\n_SCALE = 0.97\n_LEAK = 0.06\n\n\ndef _gelu_approx(x: torch.Tensor) -> torch.Tensor:\n    # Approximate GELU: 0.5 * x * (1 + tanh( sqrt(2/pi) * (x + 0.044715 x^3) ))\n    return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * x * x * x)))\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"Activation applied after every conv and hidden linear layer.\n\n    Returns a tensor with the same shape as the input.\n\n    Implementation: scaled GELU with a small linear negative tail added for x<0.\n    \"\"\"\n    g = _gelu_approx(x)\n    # Add a tiny linear leak only on negative inputs to keep gradients flowing.\n    neg_tail = torch.where(x < 0, _LEAK * x, torch.zeros_like(x))\n    return _SCALE * (g + neg_tail)\n",
+  "hypothesis": "Replacing the tempered-Mish with a mild 'Leaky-GELU' (GELU + small linear negative tail, modest scale) will improve the mean validation accuracy by at least 0.01 over the parent (i.e., mean validation accuracy >= 0.762).",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7334999999999999,
+  "val_accs": [
+   0.744,
+   0.7095,
+   0.747
+  ],
+  "seconds": 18.39860439300537
+ },
+ {
+  "name": "child_006",
+  "parent": "child_002",
+  "code": "import torch\nfrom torch import nn\nimport math\n\n# RMS-damped tempered Mish (variant)\n# act(x) = SCALE * x * tanh( softplus(BETA * x) ) / sqrt(1 + GAMMA * x^2)\n# - Keeps the smooth, non-monotonic shape of Mish while mildly damping large-magnitude\n#   activations via a cheap per-element RMS-style denominator. This aims to reduce\n#   activation explosion/instability on this small AlexNet and short CPU training budget\n#   without adding state or expensive ops.\n# - Stateless, elementwise, uses torch.nn.functional.softplus and torch.tanh; all ops are\n#   vectorized and cheap.\n\n_SCALE = 0.98\n_BETA = 0.9\n_GAMMA = 0.035\n\n\ndef act(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"RMS-damped tempered Mish activation.\n\n    Returns a tensor with the same shape as input `x`.\n\n    Implementation: SCALE * x * tanh( softplus(BETA * x) ) / sqrt(1 + GAMMA * x^2)\n    \"\"\"\n    # softplus(beta * x)\n    sp = torch.nn.functional.softplus(_BETA * x)\n    # classic Mish core\n    mish_core = x * torch.tanh(sp)\n    # RMS-style damping denominator (>= 1), keeps outputs bounded for large |x|\n    denom = torch.sqrt(1.0 + _GAMMA * (x * x))\n    return _SCALE * mish_core / denom\n",
+  "hypothesis": "This RMS-damped tempered-Mish will improve mean validation accuracy by at least 0.01 over the parent (i.e. mean validation accuracy >= 0.762). If the mean is below 0.762 the hypothesis is falsified.",
+  "novelty": "variant",
+  "ok": true,
+  "val_acc": 0.7479999999999999,
+  "val_accs": [
+   0.75,
+   0.7355,
+   0.7585
+  ],
+  "seconds": 24.39104199409485
+ }
+]

@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def act(x):\n    return torch.relu(x)\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.771667718887329
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "def act(x):\n    return torch.nn.functional.elu(x)\n",
+  "hypothesis": "known design: ELU",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7518333333333334,
+  "val_accs": [
+   0.73,
+   0.756,
+   0.7695
+  ],
+  "seconds": 6.292304277420044
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "def act(x):\n    return torch.clamp(x, min=0.0, max=5.8)\n",
+  "hypothesis": "known design: clipped ReLU at 5.8",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7208333333333333,
+  "val_accs": [
+   0.7185,
+   0.7065,
+   0.7375
+  ],
+  "seconds": 6.321542739868164
+ },
+ {
+  "name": "child_003",
+  "parent": "child_001",
+  "code": "def act(x):\n    return torch.clamp(x, min=0.0, max=4.1)\n",
+  "hypothesis": "known design: clipped ReLU at 4.1",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7174999999999999,
+  "val_accs": [
+   0.7265,
+   0.6915,
+   0.7345
+  ],
+  "seconds": 6.1649088859558105
+ },
+ {
+  "name": "child_004",
+  "parent": "child_001",
+  "code": "def act(x):\n    return torch.nn.functional.softplus(x, beta=2.7)\n",
+  "hypothesis": "known design: softplus, beta 2.7",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6583333333333333,
+  "val_accs": [
+   0.6865,
+   0.6485,
+   0.64
+  ],
+  "seconds": 6.131802797317505
+ },
+ {
+  "name": "child_005",
+  "parent": "child_001",
+  "code": "def act(x):\n    return torch.nn.functional.elu(x)\n",
+  "hypothesis": "known design: ELU",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7518333333333334,
+  "val_accs": [
+   0.73,
+   0.756,
+   0.7695
+  ],
+  "seconds": 6.3979456424713135
+ },
+ {
+  "name": "child_006",
+  "parent": "child_005",
+  "code": "def act(x):\n    return torch.where(x > 0, x, 0.03 * x)\n",
+  "hypothesis": "known design: leaky ReLU, slope 0.03",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.722,
+  "val_accs": [
+   0.7095,
+   0.7065,
+   0.75
+  ],
+  "seconds": 6.979691028594971
+ }
+]

@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def loss(logits, y):\n    return torch.nn.functional.cross_entropy(logits, y)\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 7.168403148651123
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "def loss(logits, y):\n    p = torch.log_softmax(logits, 1)\n    entropy = -(p.exp() * p).sum(1).mean()\n    return torch.nn.functional.cross_entropy(logits, y) - 0.09 * entropy\n",
+  "hypothesis": "known design: confidence penalty 0.09",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.731,
+  "val_accs": [
+   0.726,
+   0.7165,
+   0.7505
+  ],
+  "seconds": 7.581121921539307
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "def loss(logits, y):\n    logp = torch.log_softmax(logits, 1).gather(1, y[:, None]).squeeze(1)\n    return (-(1 - logp.exp()) ** 2.57 * logp).mean()\n",
+  "hypothesis": "known design: focal loss, gamma 2.57",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6955,
+  "val_accs": [
+   0.718,
+   0.6425,
+   0.726
+  ],
+  "seconds": 6.148982524871826
+ },
+ {
+  "name": "child_003",
+  "parent": "child_001",
+  "code": "def loss(logits, y):\n    logp = torch.log_softmax(logits, 1).gather(1, y[:, None]).squeeze(1)\n    return (-(1 - logp.exp()) ** 2.39 * logp).mean()\n",
+  "hypothesis": "known design: focal loss, gamma 2.39",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7085,
+  "val_accs": [
+   0.72,
+   0.683,
+   0.7225
+  ],
+  "seconds": 5.630444288253784
+ },
+ {
+  "name": "child_004",
+  "parent": "child_001",
+  "code": "def loss(logits, y):\n    logp = torch.log_softmax(logits, 1).gather(1, y[:, None]).squeeze(1)\n    return (-(1 - logp.exp()) ** 2.75 * logp).mean()\n",
+  "hypothesis": "known design: focal loss, gamma 2.75",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7066666666666667,
+  "val_accs": [
+   0.731,
+   0.661,
+   0.728
+  ],
+  "seconds": 5.719723701477051
+ },
+ {
+  "name": "child_005",
+  "parent": "child_001",
+  "code": "def loss(logits, y):\n    p = torch.log_softmax(logits, 1)\n    entropy = -(p.exp() * p).sum(1).mean()\n    return torch.nn.functional.cross_entropy(logits, y) - 0.28 * entropy\n",
+  "hypothesis": "known design: confidence penalty 0.28",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7285,
+  "val_accs": [
+   0.7245,
+   0.707,
+   0.754
+  ],
+  "seconds": 5.534714221954346
+ },
+ {
+  "name": "child_006",
+  "parent": "child_005",
+  "code": "def loss(logits, y):\n    return torch.nn.functional.cross_entropy(logits, y, label_smoothing=0.03)\n",
+  "hypothesis": "known design: label smoothing 0.03",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.726,
+  "val_accs": [
+   0.732,
+   0.6975,
+   0.7485
+  ],
+  "seconds": 5.611343622207642
+ }
+]

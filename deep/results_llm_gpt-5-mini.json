@@ -1,0 +1,112 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "\"\"\"mini-AlexNet\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        self.classifier = nn.Sequential(\n            nn.Flatten(),\n            nn.Dropout(0.5), nn.Linear(288, 128), nn.ReLU(),\n            nn.Dropout(0.5), nn.Linear(128, 128), nn.ReLU(),\n            nn.Linear(128, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": {
+   "conv": [
+    {
+     "f": 32,
+     "k": 5,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": true
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 64,
+     "k": 3,
+     "pool": false
+    },
+    {
+     "f": 32,
+     "k": 3,
+     "pool": true
+    }
+   ],
+   "fc": [
+    128,
+    128
+   ],
+   "dropout": 0.5
+  },
+  "hypothesis": "AlexNet-style starting point",
+  "ok": true,
+  "val_acc": 0.7235,
+  "params": 166442,
+  "seconds": 8.283105611801147
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "\"\"\"mini-AlexNet with global average pooling head\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        # Substantive change: replace large fully-connected classifier with\n        # a global average pooling head followed by a single linear layer.\n        # This greatly reduces parameters and encourages spatially-averaged\n        # features for classification, which often helps with small-data fast learning.\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),  # output: (batch, 32, 1, 1)\n            nn.Flatten(),                  # output: (batch, 32)\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Replacing the large fully-connected classifier with a global average pooling + single linear layer will reduce the model size (from 166,442 params to about 111,000 params) and improve fast learning / generalisation; I hypothesize validation accuracy will increase by >=0.02 (i.e. from 0.724 to >=0.744) after the same 2-epoch training protocol.",
+  "ok": true,
+  "val_acc": 0.731,
+  "params": 111978,
+  "seconds": 3.9538347721099854
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "\"\"\"mini-AlexNet with global average pooling head + BatchNorm after each Conv\n\nOne substantive change from parent: BatchNorm layers inserted after each Conv2d\nand before ReLU. This should stabilize and accelerate early training.\n\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 64, kernel_size=3, padding=1), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.Conv2d(64, 32, kernel_size=3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n        # Global average pooling head followed by a single linear layer.\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),  # output: (batch, 32, 1, 1)\n            nn.Flatten(),                  # output: (batch, 32)\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding Batch Normalization after each convolution will improve training stability and speed; I hypothesise this will raise validation accuracy by at least 0.02 (from 0.731 to >= 0.751) after 2 epochs on the same protocol. The parameter count will increase only slightly (by <1000 parameters).",
+  "ok": true,
+  "val_acc": 0.83,
+  "params": 112490,
+  "seconds": 4.820705890655518
+ },
+ {
+  "name": "child_003",
+  "parent": "child_002",
+  "code": "\"\"\"mini-AlexNet variant: introduce residual (skip) connections across convolutional blocks.\n\nOne substantive change from parent: replace some stacked conv layers with small residual blocks\n(conv-BN-ReLU-conv-BN + skip connection). This should improve gradient flow and help the\nnetwork learn faster in the limited 2-epoch training regime.\n\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass ResidualBlock(nn.Module):\n    \"\"\"Basic 2-conv residual block. Adds a 1x1 conv skip when channels change.\"\"\"\n\n    def __init__(self, in_channels, out_channels):\n        super().__init__()\n        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)\n        self.bn1 = nn.BatchNorm2d(out_channels)\n        self.relu = nn.ReLU()\n        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)\n        self.bn2 = nn.BatchNorm2d(out_channels)\n        if in_channels != out_channels:\n            # match channels for the skip connection\n            self.downsample = nn.Conv2d(in_channels, out_channels, kernel_size=1)\n        else:\n            self.downsample = None\n\n    def forward(self, x):\n        identity = x\n        out = self.conv1(x)\n        out = self.bn1(out)\n        out = self.relu(out)\n        out = self.conv2(out)\n        out = self.bn2(out)\n        if self.downsample is not None:\n            identity = self.downsample(identity)\n        out += identity\n        out = self.relu(out)\n        return out\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # initial conv stage (same as parent)\n        self.stem = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2),\n            nn.BatchNorm2d(32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 28 -> 14\n        )\n\n        # Residual block increasing channels 32 -> 64\n        self.res1 = ResidualBlock(32, 64)\n        self.pool1 = nn.MaxPool2d(2)  # 14 -> 7\n\n        # Another residual block keeping 64 channels\n        self.res2 = ResidualBlock(64, 64)\n\n        # Reduce channels before final pooling (similar to parent)\n        self.conv_reduce = nn.Sequential(\n            nn.Conv2d(64, 32, kernel_size=3, padding=1),\n            nn.BatchNorm2d(32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 7 -> 3\n        )\n\n        # Global average pooling head followed by a single linear layer.\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),  # output: (batch, 32, 1, 1)\n            nn.Flatten(),                  # output: (batch, 32)\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        x = self.stem(x)\n        x = self.res1(x)\n        x = self.pool1(x)\n        x = self.res2(x)\n        x = self.conv_reduce(x)\n        x = self.classifier(x)\n        return x\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding residual (skip) connections between convolutional layers will improve gradient flow and speed early training; I hypothesize validation accuracy will increase by at least 0.02 (from 0.830 to >=0.85) after 2 epochs on 6,000 images.",
+  "ok": true,
+  "val_acc": 0.8305,
+  "params": 151658,
+  "seconds": 11.936953783035278
+ },
+ {
+  "name": "child_004",
+  "parent": "child_003",
+  "code": "\"\"\"mini-AlexNet variant using Group Normalization instead of Batch Normalization.\n\nOne substantive change from parent: replace all nn.BatchNorm2d with nn.GroupNorm(num_groups=8, num_channels=...).\nGroupNorm is more robust to small batch sizes and should help the model learn faster during the limited 2-epoch\ntraining on a small subset of data.\n\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass ResidualBlock(nn.Module):\n    \"\"\"Basic 2-conv residual block. Adds a 1x1 conv skip when channels change.\n\n    Uses GroupNorm instead of BatchNorm for more stable training with small batches.\n    \"\"\"\n\n    def __init__(self, in_channels, out_channels, groups=8):\n        super().__init__()\n        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)\n        # GroupNorm: number of groups must divide channels\n        g1 = groups if out_channels % groups == 0 else 1\n        self.gn1 = nn.GroupNorm(g1, out_channels)\n        self.relu = nn.ReLU()\n        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)\n        g2 = groups if out_channels % groups == 0 else 1\n        self.gn2 = nn.GroupNorm(g2, out_channels)\n        if in_channels != out_channels:\n            # match channels for the skip connection\n            self.downsample = nn.Conv2d(in_channels, out_channels, kernel_size=1)\n        else:\n            self.downsample = None\n\n    def forward(self, x):\n        identity = x\n        out = self.conv1(x)\n        out = self.gn1(out)\n        out = self.relu(out)\n        out = self.conv2(out)\n        out = self.gn2(out)\n        if self.downsample is not None:\n            identity = self.downsample(identity)\n        out += identity\n        out = self.relu(out)\n        return out\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # initial conv stage (same as parent but with GroupNorm)\n        # choose groups so they divide 32\n        self.stem = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2),\n            nn.GroupNorm(8, 32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 28 -> 14\n        )\n\n        # Residual block increasing channels 32 -> 64\n        self.res1 = ResidualBlock(32, 64, groups=8)\n        self.pool1 = nn.MaxPool2d(2)  # 14 -> 7\n\n        # Another residual block keeping 64 channels\n        self.res2 = ResidualBlock(64, 64, groups=8)\n\n        # Reduce channels before final pooling (similar to parent)\n        # use GroupNorm here as well\n        self.conv_reduce = nn.Sequential(\n            nn.Conv2d(64, 32, kernel_size=3, padding=1),\n            nn.GroupNorm(8, 32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),  # 7 -> 3\n        )\n\n        # Global average pooling head followed by a single linear layer.\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),  # output: (batch, 32, 1, 1)\n            nn.Flatten(),                  # output: (batch, 32)\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        x = self.stem(x)\n        x = self.res1(x)\n        x = self.pool1(x)\n        x = self.res2(x)\n        x = self.conv_reduce(x)\n        x = self.classifier(x)\n        return x\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Replacing BatchNorm with GroupNorm (8 groups) across the network will improve validation accuracy in this small-batch, short-training regime by at least +0.02 (from 0.831 to >=0.851) due to more stable normalization when batch statistics are unreliable.",
+  "ok": true,
+  "val_acc": 0.769,
+  "params": 151658,
+  "seconds": 9.166236400604248
+ },
+ {
+  "name": "child_005",
+  "parent": "child_002",
+  "code": "\"\"\"mini-AlexNet variant using depthwise-separable convolutions in the later stages\n\nOne substantive change from parent: the two 3x3 Conv2d layers after the second\npool are replaced with depthwise-separable convolutions (depthwise 3x3 followed\nby 1x1 pointwise). BatchNorm is kept after each pointwise conv, before ReLU,\nmatching the parent's BN placement. This is intended to increase parameter\nefficiency and improve early training on the small training budget.\n\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass SeparableConv(nn.Module):\n    \"\"\"Depthwise separable convolution: depthwise 3x3 then pointwise 1x1.\n    BatchNorm applied after pointwise conv, then ReLU.\"\"\"\n\n    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1):\n        super().__init__()\n        # depthwise conv: groups=in_channels\n        self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size,\n                                   padding=padding, groups=in_channels, bias=False)\n        # pointwise conv to mix channels\n        self.pointwise = nn.Conv2d(in_channels, out_channels, 1, bias=False)\n        self.bn = nn.BatchNorm2d(out_channels)\n        self.relu = nn.ReLU()\n\n    def forward(self, x):\n        x = self.depthwise(x)\n        x = self.pointwise(x)\n        x = self.bn(x)\n        return self.relu(x)\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.features = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2, bias=False), nn.BatchNorm2d(32), nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(32, 64, kernel_size=3, padding=1, bias=False), nn.BatchNorm2d(64), nn.ReLU(),\n            nn.MaxPool2d(2),\n            # Replace the later standard 3x3 convs with depthwise-separable convs\n            SeparableConv(64, 64, kernel_size=3, padding=1),\n            SeparableConv(64, 32, kernel_size=3, padding=1),\n            nn.MaxPool2d(2),\n        )\n        # Global average pooling head followed by a single linear layer.\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),  # output: (batch, 32, 1, 1)\n            nn.Flatten(),                  # output: (batch, 32)\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        return self.classifier(self.features(x))\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Replacing the later standard 3x3 convolutions with depthwise-separable convolutions will substantially reduce parameter count (>20% reduction) and improve early validation accuracy after 2 epochs on 6k images (I expect validation accuracy to increase from 0.830 to >= 0.835) because separable convs are more parameter-efficient and often learn faster with limited training budget.",
+  "ok": true,
+  "val_acc": 0.78,
+  "params": 27242,
+  "seconds": 5.664889574050903
+ },
+ {
+  "name": "child_006",
+  "parent": "child_002",
+  "code": "\"\"\"mini-AlexNet variant: introduce residual (skip) connections across convolutional pairs\n\nOne substantive change from parent: pairs of 3x3 convolutions are wrapped\ninto Residual blocks with identity (or 1x1 conv) shortcuts. BatchNorm stays\nafter each Conv and before ReLU; global average pooling head retained.\n\"\"\"\nimport torch\nfrom torch import nn\n\n\nclass ResidualBlock(nn.Module):\n    \"\"\"Two 3x3 convs with a residual skip. If channels differ, use 1x1 conv on the skip.\"\"\"\n\n    def __init__(self, in_ch, out_ch):\n        super().__init__()\n        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1)\n        self.bn1 = nn.BatchNorm2d(out_ch)\n        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1)\n        self.bn2 = nn.BatchNorm2d(out_ch)\n        if in_ch != out_ch:\n            self.skip = nn.Conv2d(in_ch, out_ch, kernel_size=1)\n        else:\n            self.skip = None\n        self.relu = nn.ReLU()\n\n    def forward(self, x):\n        identity = x\n        out = self.conv1(x)\n        out = self.bn1(out)\n        out = self.relu(out)\n        out = self.conv2(out)\n        out = self.bn2(out)\n        if self.skip is not None:\n            identity = self.skip(identity)\n        out += identity\n        out = self.relu(out)\n        return out\n\n\nclass Net(nn.Module):\n    def __init__(self):\n        super().__init__()\n        # initial conv (5x5) like parent\n        self.stem = nn.Sequential(\n            nn.Conv2d(1, 32, kernel_size=5, padding=2),\n            nn.BatchNorm2d(32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n\n        # Residual block expanding 32 -> 64, then downsample\n        self.res1 = nn.Sequential(\n            ResidualBlock(32, 64),\n            nn.MaxPool2d(2),\n        )\n\n        # Two residual blocks at 64 channels (keeps channel count)\n        self.res2 = nn.Sequential(\n            ResidualBlock(64, 64),\n            ResidualBlock(64, 64),\n        )\n\n        # final conv to reduce channels to 32, then pool\n        self.tail = nn.Sequential(\n            nn.Conv2d(64, 32, kernel_size=3, padding=1),\n            nn.BatchNorm2d(32),\n            nn.ReLU(),\n            nn.MaxPool2d(2),\n        )\n\n        # Global average pooling head -> 10 logits\n        self.classifier = nn.Sequential(\n            nn.AdaptiveAvgPool2d((1, 1)),\n            nn.Flatten(),\n            nn.Linear(32, 10),\n        )\n\n    def forward(self, x):\n        x = self.stem(x)\n        x = self.res1(x)\n        x = self.res2(x)\n        x = self.tail(x)\n        x = self.classifier(x)\n        return x\n\n\ndef build_model():\n    return Net()\n",
+  "genome": null,
+  "hypothesis": "Adding residual (skip) connections across pairs of convolutional layers will improve early training stability and increase validation accuracy after 2 epochs by at least +0.005 (i.e. from 0.830 to >=0.835). The parameter count will increase modestly (expected ~150k) but remain well under 1,000,000.",
+  "ok": true,
+  "val_acc": 0.8105,
+  "params": 225770,
+  "seconds": 21.724900245666504
+ }
+]

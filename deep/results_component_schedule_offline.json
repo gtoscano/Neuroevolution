@@ -1,0 +1,107 @@
+[
+ {
+  "name": "seed",
+  "parent": null,
+  "code": "def lr(step, total):\n    return 1e-3\n",
+  "hypothesis": "textbook default",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.7254999999999999,
+  "val_accs": [
+   0.7205,
+   0.7105,
+   0.7455
+  ],
+  "seconds": 5.545190095901489
+ },
+ {
+  "name": "child_001",
+  "parent": "seed",
+  "code": "import math\n\n\ndef lr(step, total):\n    return 2.57e-03\n",
+  "hypothesis": "known design: constant 2.6e-03",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.741,
+  "val_accs": [
+   0.7515,
+   0.72,
+   0.7515
+  ],
+  "seconds": 5.798593044281006
+ },
+ {
+  "name": "child_002",
+  "parent": "child_001",
+  "code": "import math\n\n\ndef lr(step, total):\n    if step < 55:\n        return 9.68e-04 * (step + 1) / 55\n    return 9.68e-04 * (total - step) / (total - 55)\n",
+  "hypothesis": "known design: warm-up 55 steps, linear decay, peak 9.7e-04",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6948333333333333,
+  "val_accs": [
+   0.708,
+   0.6515,
+   0.725
+  ],
+  "seconds": 5.757006406784058
+ },
+ {
+  "name": "child_003",
+  "parent": "child_001",
+  "code": "import math\n\n\ndef lr(step, total):\n    return 1.28e-03 * 0.5 * (1 + math.cos(math.pi * step / total))\n",
+  "hypothesis": "known design: cosine from 1.3e-03",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6923333333333334,
+  "val_accs": [
+   0.6995,
+   0.657,
+   0.7205
+  ],
+  "seconds": 5.695572853088379
+ },
+ {
+  "name": "child_004",
+  "parent": "child_001",
+  "code": "import math\n\n\ndef lr(step, total):\n    return 4.84e-03 * 0.5 * (1 + math.cos(math.pi * step / total))\n",
+  "hypothesis": "known design: cosine from 4.8e-03",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6779999999999999,
+  "val_accs": [
+   0.644,
+   0.703,
+   0.687
+  ],
+  "seconds": 5.774353742599487
+ },
+ {
+  "name": "child_005",
+  "parent": "seed",
+  "code": "import math\n\n\ndef lr(step, total):\n    if step < 59:\n        return 3.88e-04 * (step + 1) / 59\n    return 3.88e-04 * (total - step) / (total - 59)\n",
+  "hypothesis": "known design: warm-up 59 steps, linear decay, peak 3.9e-04",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.6148333333333333,
+  "val_accs": [
+   0.6245,
+   0.6035,
+   0.6165
+  ],
+  "seconds": 5.562512159347534
+ },
+ {
+  "name": "child_006",
+  "parent": "seed",
+  "code": "import math\n\n\ndef lr(step, total):\n    return 8.41e-04 * 0.5 * (1 + math.cos(math.pi * step / total))\n",
+  "hypothesis": "known design: cosine from 8.4e-04",
+  "novelty": "known",
+  "ok": true,
+  "val_acc": 0.664,
+  "val_accs": [
+   0.664,
+   0.6205,
+   0.7075
+  ],
+  "seconds": 5.866460084915161
+ }
+]
